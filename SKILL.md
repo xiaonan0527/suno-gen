@@ -20,13 +20,13 @@ description: 使用 Nange AI Suno API 生成音乐，支持灵感模式和自定
 
 ### 2. 检查 API Key 配置
 
-优先读取环境变量 `NANGE_API_KEY`，如果未设置则检查配置文件 `~/.nange-ai/config.json`。
+优先读取环境变量 `NANGE_SUNO_API_KEY`，如果未设置则检查配置文件 `~/.nange-ai/config.json`。
 
 如果都不存在，引导用户选择一种方式配置：
 
 **方式 A：环境变量（推荐）**
 ```bash
-export NANGE_API_KEY="这里粘贴你的Key"
+export NANGE_SUNO_API_KEY="这里粘贴你的Key"
 ```
 
 **方式 B：配置文件**

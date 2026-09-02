@@ -22,7 +22,7 @@ AI 会自动完成安装和配置。
 需要设置环境变量：
 
 ```bash
-export NANGE_API_KEY="your-api-key-here"
+export NANGE_SUNO_API_KEY="your-api-key-here"
 ```
 
 如果还没有 API Key，前往 [Nange AI 控制台](https://api.nange-ai.com/keys) 创建一个 **Suno 分组** 的密钥。

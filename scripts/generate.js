@@ -17,7 +17,7 @@ const BASE_URL = 'https://api.nange-ai.com/suno/v1';
  * 读取 API Key（优先级：环境变量 > 配置文件）
  */
 function loadApiKey() {
-  const envKey = process.env.NANGE_API_KEY || process.env.SUNO_API_KEY;
+  const envKey = process.env.NANGE_SUNO_API_KEY || process.env.SUNO_API_KEY;
   if (envKey && envKey.trim()) {
     return envKey.trim();
   }
@@ -36,7 +36,7 @@ function loadApiKey() {
   console.error('请选择以下任一方式配置：');
   console.error('');
   console.error('  方式 A（环境变量）：');
-  console.error('    export NANGE_API_KEY="your-api-key"');
+  console.error('    export NANGE_SUNO_API_KEY="your-api-key"');
   console.error('');
   console.error('  方式 B（配置文件）：');
   if (process.platform === 'win32') {
