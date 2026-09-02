@@ -20,7 +20,11 @@ description: 使用 Nange AI Suno API 生成音乐，支持灵感模式和自定
 
 ### 2. 检查 API Key 配置
 
-优先读取环境变量 `NANGE_SUNO_API_KEY`，如果未设置则检查配置文件 `~/.nange-ai/config.json`。
+优先读取环境变量 `NANGE_SUNO_API_KEY`，如果未设置则检查 Suno 专属配置文件 `~/.nange-ai/suno-config.json`。
+
+> ⚠ **注意**：Suno 与 GPT-Image 使用不同的 API Key 和配置文件，互不冲突。
+> - Suno：环境变量 `NANGE_SUNO_API_KEY`，配置文件 `~/.nange-ai/suno-config.json`
+> - GPT-Image：环境变量 `NANGE_API_KEY`，配置文件 `~/.nange-ai/config.json`
 
 如果都不存在，引导用户选择一种方式配置：
 
@@ -29,16 +33,16 @@ description: 使用 Nange AI Suno API 生成音乐，支持灵感模式和自定
 export NANGE_SUNO_API_KEY="这里粘贴你的Key"
 ```
 
-**方式 B：配置文件**
+**方式 B：Suno 专属配置文件**
 
 **macOS / Linux：**
 ```bash
-mkdir -p ~/.nange-ai && echo '{"api_key":"这里粘贴你的Key"}' > ~/.nange-ai/config.json
+mkdir -p ~/.nange-ai && echo '{"api_key":"这里粘贴你的Key"}' > ~/.nange-ai/suno-config.json
 ```
 
 **Windows (PowerShell)：**
 ```powershell
-mkdir -Force "$env:USERPROFILE\.nange-ai" | Out-Null; '{"api_key":"这里粘贴你的Key"}' | Set-Content "$env:USERPROFILE\.nange-ai\config.json"
+mkdir -Force "$env:USERPROFILE\.nange-ai" | Out-Null; '{"api_key":"这里粘贴你的Key"}' | Set-Content "$env:USERPROFILE\.nange-ai\suno-config.json"
 ```
 
 告知用户 API Key 在这里创建：https://api.nange-ai.com/keys （选择 **Suno** 分组）

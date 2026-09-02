@@ -19,13 +19,21 @@ AI 会自动完成安装和配置。
 
 ## 配置
 
-需要设置环境变量：
+**方式 A：环境变量（推荐）**
 
 ```bash
 export NANGE_SUNO_API_KEY="your-api-key-here"
 ```
 
+**方式 B：Suno 专属配置文件**
+
+```bash
+mkdir -p ~/.nange-ai && echo '{"api_key":"your-api-key-here"}' > ~/.nange-ai/suno-config.json
+```
+
 如果还没有 API Key，前往 [Nange AI 控制台](https://api.nange-ai.com/keys) 创建一个 **Suno 分组** 的密钥。
+
+> **注意**：Suno 与 GPT-Image 使用不同的 Key 和配置，互不冲突。Suno 用 `NANGE_SUNO_API_KEY` + `suno-config.json`，GPT-Image 用 `NANGE_API_KEY` + `config.json`。
 
 ## 使用
 

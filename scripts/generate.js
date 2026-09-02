@@ -10,11 +10,12 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const CONFIG_PATH = path.join(os.homedir(), '.nange-ai', 'config.json');
+const SUNO_CONFIG_PATH = path.join(os.homedir(), '.nange-ai', 'suno-config.json');
+const LEGACY_CONFIG_PATH = path.join(os.homedir(), '.nange-ai', 'config.json');
 const BASE_URL = 'https://api.nange-ai.com/suno/v1';
 
 /**
- * 读取 API Key（优先级：环境变量 > 配置文件）
+ * 读取 API Key（优先级：环境变量 > Suno 专属配置 > 通用配置的 suno_api_key 字段）
  */
 function loadApiKey() {
   const envKey = process.env.NANGE_SUNO_API_KEY || process.env.SUNO_API_KEY;
@@ -22,28 +23,41 @@ function loadApiKey() {
     return envKey.trim();
   }
 
-  if (fs.existsSync(CONFIG_PATH)) {
+  // Suno 专属配置文件
+  if (fs.existsSync(SUNO_CONFIG_PATH)) {
     try {
-      const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+      const config = JSON.parse(fs.readFileSync(SUNO_CONFIG_PATH, 'utf-8'));
       if (config.api_key && config.api_key !== 'YOUR_KEY' && config.api_key.trim()) {
         return config.api_key.trim();
       }
     } catch (_) { /* ignore parse errors */ }
   }
 
-  console.error('错误：未找到 API Key');
+  // 兼容：从通用配置读取 suno_api_key 字段
+  if (fs.existsSync(LEGACY_CONFIG_PATH)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf-8'));
+      if (config.suno_api_key && config.suno_api_key !== 'YOUR_KEY' && config.suno_api_key.trim()) {
+        return config.suno_api_key.trim();
+      }
+    } catch (_) { /* ignore parse errors */ }
+  }
+
+  console.error('错误：未找到 Suno API Key');
   console.error('');
   console.error('请选择以下任一方式配置：');
   console.error('');
-  console.error('  方式 A（环境变量）：');
+  console.error('  方式 A（环境变量，推荐）：');
   console.error('    export NANGE_SUNO_API_KEY="your-api-key"');
   console.error('');
-  console.error('  方式 B（配置文件）：');
+  console.error('  方式 B（Suno 专属配置文件）：');
   if (process.platform === 'win32') {
-    console.error(`    mkdir "%USERPROFILE%\\.nange-ai" && echo {"api_key":"YOUR_KEY"} > "%USERPROFILE%\\.nange-ai\\config.json"`);
+    console.error(`    mkdir "%USERPROFILE%\\.nange-ai" && echo {"api_key":"YOUR_KEY"} > "%USERPROFILE%\\.nange-ai\\suno-config.json"`);
   } else {
-    console.error(`    mkdir -p ~/.nange-ai && echo '{"api_key":"YOUR_KEY"}' > ~/.nange-ai/config.json`);
+    console.error(`    mkdir -p ~/.nange-ai && echo '{"api_key":"YOUR_KEY"}' > ~/.nange-ai/suno-config.json`);
   }
+  console.error('');
+  console.error('  ⚠ 注意：Suno 与 GPT-Image 使用不同的 API Key，请勿混用。');
   console.error('');
   console.error('API Key 创建地址：https://api.nange-ai.com/keys（选择 Suno 分组）');
   process.exit(1);
