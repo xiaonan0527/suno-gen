@@ -81,7 +81,7 @@ node "$SKILL_DIR/scripts/generate.js" \
   --out "./meditation.mp3"
 ```
 
-脚本自动完成：提交任务 → 轮询状态 → 下载音频到本地 → stdout 输出本地文件路径。
+脚本自动完成：提交任务 → 轮询状态 → 下载音频/封面/歌词/视频到本地 → stdout 输出音频文件路径。
 
 ### 判断使用灵感模式还是自定义模式
 
@@ -104,6 +104,17 @@ node "$SKILL_DIR/scripts/generate.js" \
 
 ## 输出
 
-脚本成功后将音频下载到 `--out` 指定的本地路径（默认 `./output.mp3`），stdout 输出本地文件的绝对路径。将该路径展示给用户即可。
+脚本成功后会自动下载以下文件到 `--out` 指定路径的同级目录：
 
-stderr 还会输出歌曲标题、风格标签、时长、封面图片链接、视频链接等元信息，可展示给用户。
+- **音频文件**：`<name>.mp3` — 生成的歌曲（stdout 输出此文件的绝对路径）
+- **封面图片**：`<name>_cover.jpg` — 歌曲封面（自动下载，如果上游返回了封面）
+- **歌词文件**：`<name>_lyrics.txt` — 完整歌词（自动保存，如果上游返回了歌词）
+- **视频文件**：`<name>_video.mp4` — 音乐视频（自动下载，如果上游返回了视频）
+
+例如 `--out ./summer-song.mp3` 会生成：
+- `./summer-song.mp3`（音频）
+- `./summer-song_cover.jpg`（封面）
+- `./summer-song_lyrics.txt`（歌词）
+- `./summer-song_video.mp4`（视频，如有）
+
+stderr 还会输出歌曲标题、风格标签、时长等元信息，可展示给用户。
