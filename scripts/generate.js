@@ -283,17 +283,43 @@ async function main() {
   if (outDir) {
     fs.mkdirSync(outDir, { recursive: true });
   }
+  const baseName = path.basename(outPath, path.extname(outPath));
 
   process.stderr.write(`正在下载音频到 ${outPath} ...\n`);
   await downloadFile(audioUrl, outPath, apiKey);
-  process.stderr.write(`下载完成\n`);
+  process.stderr.write(`音频下载完成\n`);
 
-  // 如果有封面图，也输出信息
-  if (track.image_url) {
-    process.stderr.write(`封面图片: ${track.image_url}\n`);
+  // 下载封面图片
+  if (track.image_url || track.image_large_url) {
+    const imgUrl = track.image_large_url || track.image_url;
+    const imgExt = imgUrl.includes('.png') ? '.png' : '.jpg';
+    const imgPath = path.join(outDir, baseName + '_cover' + imgExt);
+    try {
+      process.stderr.write(`正在下载封面到 ${imgPath} ...\n`);
+      await downloadFile(imgUrl, imgPath, apiKey);
+      process.stderr.write(`封面下载完成\n`);
+    } catch (e) {
+      process.stderr.write(`封面下载失败: ${e.message}\n`);
+    }
   }
+
+  // 保存歌词
+  if (track.lyrics) {
+    const lyricsPath = path.join(outDir, baseName + '_lyrics.txt');
+    fs.writeFileSync(lyricsPath, track.lyrics, 'utf-8');
+    process.stderr.write(`歌词已保存到 ${lyricsPath}\n`);
+  }
+
+  // 下载视频（如果有）
   if (track.video_url) {
-    process.stderr.write(`音乐视频: ${track.video_url}\n`);
+    const videoPath = path.join(outDir, baseName + '_video.mp4');
+    try {
+      process.stderr.write(`正在下载视频到 ${videoPath} ...\n`);
+      await downloadFile(track.video_url, videoPath, apiKey);
+      process.stderr.write(`视频下载完成\n`);
+    } catch (e) {
+      process.stderr.write(`视频下载失败: ${e.message}\n`);
+    }
   }
 
   // stdout 输出本地文件路径
