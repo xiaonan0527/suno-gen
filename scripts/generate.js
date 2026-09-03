@@ -131,7 +131,7 @@ async function submitTask(apiKey, opts) {
     body.title = opts.title;
   }
   if (opts.tags) {
-    body.tags = opts.tags;
+    body.style = opts.tags;
   }
 
   const payload = JSON.stringify(body);
