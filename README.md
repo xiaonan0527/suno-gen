@@ -89,11 +89,24 @@ node scripts/generate.js \
   --out ./love-song.mp3
 ```
 
+### 下载已有任务
+
+用 `--task-id` 直接查询并下载已有任务，无需重新提交：
+
+```bash
+node scripts/generate.js \
+  --task-id "task_01M1NVT42Z01GEHDW0WEDSKGNE" \
+  --out ./retry-download.mp3
+```
+
+适用场景：下载失败重试、补下封面/歌词、重新保存之前的歌曲。
+
 ## 参数
 
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
-| `--prompt` | 音乐描述或歌词（必填） | - |
+| `--prompt` | 音乐描述或歌词（与 `--task-id` 二选一） | - |
+| `--task-id` | 已有任务 ID（直接查询下载，跳过提交） | - |
 | `--out` | 输出文件路径 | `./output.mp3` |
 | `--version` | Suno 版本 | `v5.5` |
 | `--custom` | 启用自定义模式（传歌词） | `false` |

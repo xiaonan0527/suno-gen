@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * Suno 音乐生成脚本
- * 提交生成任务 → 轮询任务状态 → 下载音频到本地
+ * 支持两种模式：
+ *   1. 提交新任务：--prompt → 提交 → 轮询 → 下载
+ *   2. 下载已有任务：--task-id → 查询 → 下载
  */
 
 const https = require('https');
@@ -160,6 +162,26 @@ async function submitTask(apiKey, opts) {
   return taskIds[0];
 }
 
+/**
+ * 查询任务状态（单次），返回 { status, music, progress }
+ */
+async function fetchTaskStatus(apiKey, taskId) {
+  const result = await request(`${BASE_URL}/music/tasks/${taskId}`, {
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+  });
+
+  const data = result.data || result;
+  const status = (data.status || '').toLowerCase();
+  const music = (data.result && data.result.music) || [];
+  const progress = data.progress || 0;
+  const errorMsg = (data.error && data.error.message) || data.message || '';
+
+  return { status, music, progress, errorMsg };
+}
+
+/**
+ * 轮询任务直到完成或失败
+ */
 async function pollTask(apiKey, taskId, interval) {
   const timeout = 15 * 60 * 1000; // Suno 生成可能需要 5-10 分钟
   const start = Date.now();
@@ -169,112 +191,27 @@ async function pollTask(apiKey, taskId, interval) {
       throw new Error('任务超时（超过 15 分钟）');
     }
 
-    const result = await request(`${BASE_URL}/music/tasks/${taskId}`, {
-      headers: { 'Authorization': `Bearer ${apiKey}` },
-    });
-
-    const data = result.data || result;
-    const status = (data.status || '').toLowerCase();
+    const { status, music, progress, errorMsg } = await fetchTaskStatus(apiKey, taskId);
 
     if (status === 'completed') {
-      const music = (data.result && data.result.music) || [];
       if (music.length === 0) {
         throw new Error('任务完成但未返回音乐数据');
       }
       return music;
     }
     if (status === 'failed') {
-      const errMsg = (data.error && data.error.message) || data.message || '任务失败';
-      throw new Error(errMsg);
+      throw new Error(errorMsg || '任务失败');
     }
 
-    const progress = data.progress || 0;
     process.stderr.write(`生成中... ${progress}% (状态: ${status})\n`);
     await new Promise((r) => setTimeout(r, interval));
   }
 }
 
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const parsed = {
-    version: 'v5.5',
-    custom: false,
-    instrumental: false,
-    out: './output.mp3',
-    pollInterval: 5000,
-    vocalGender: '',
-    title: '',
-    tags: '',
-  };
-
-  for (let i = 0; i < args.length; i++) {
-    switch (args[i]) {
-      case '--prompt': parsed.prompt = args[++i]; break;
-      case '--version': parsed.version = args[++i]; break;
-      case '--custom': parsed.custom = true; break;
-      case '--instrumental': parsed.instrumental = true; break;
-      case '--vocal-gender': parsed.vocalGender = args[++i]; break;
-      case '--title': parsed.title = args[++i]; break;
-      case '--tags': parsed.tags = args[++i]; break;
-      case '--out': parsed.out = args[++i]; break;
-      case '--poll-interval': parsed.pollInterval = parseInt(args[++i], 10) * 1000; break;
-      case '--help':
-      case '-h':
-        printUsage();
-        process.exit(0);
-    }
-  }
-
-  if (!parsed.prompt) {
-    console.error('错误：--prompt 参数是必填的');
-    console.error('');
-    printUsage();
-    process.exit(1);
-  }
-  return parsed;
-}
-
-function printUsage() {
-  console.error('用法: node generate.js --prompt "提示词" [选项]');
-  console.error('');
-  console.error('选项:');
-  console.error('  --prompt <text>          音乐描述或歌词（必填）');
-  console.error('  --version <ver>          Suno 版本（默认 v5.5）');
-  console.error('                           支持: v3.5, v4, v4.5, v4.5+, v4.5-all, v5, v5.5');
-  console.error('  --custom                 使用自定义模式（传歌词）');
-  console.error('  --instrumental           生成纯音乐（无人声）');
-  console.error('  --vocal-gender <gender>  人声性别（male/female）');
-  console.error('  --title <text>           歌曲标题（自定义模式）');
-  console.error('  --tags <text>            音乐风格标签（自定义模式，如 "pop, rock"）');
-  console.error('  --out <path>             输出文件路径（默认 ./output.mp3）');
-  console.error('  --poll-interval <sec>    轮询间隔秒数（默认 5）');
-}
-
-async function main() {
-  const opts = parseArgs();
-  const apiKey = loadApiKey();
-
-  const mode = opts.custom ? '自定义模式' : '灵感模式';
-  const instrLabel = opts.instrumental ? '（纯音乐）' : '';
-  process.stderr.write(`正在提交 Suno ${opts.version} ${mode}${instrLabel}任务\n`);
-  process.stderr.write(`  prompt: ${opts.prompt}\n`);
-  if (opts.title) process.stderr.write(`  title: ${opts.title}\n`);
-  if (opts.tags) process.stderr.write(`  tags: ${opts.tags}\n`);
-  if (opts.vocalGender) process.stderr.write(`  vocal_gender: ${opts.vocalGender}\n`);
-
-  const taskId = await submitTask(apiKey, opts);
-  process.stderr.write(`任务已提交: ${taskId}\n`);
-  process.stderr.write(`轮询结果中...\n`);
-
-  const music = await pollTask(apiKey, taskId, opts.pollInterval);
-
-  if (music.length === 0) {
-    throw new Error('任务完成但未返回音乐数据');
-  }
-
-  process.stderr.write(`\n共生成 ${music.length} 首曲目\n`);
-
-  const outPath = path.resolve(opts.out);
+/**
+ * 下载所有曲目的媒体文件（音频、封面、歌词、视频）
+ */
+async function downloadAllTracks(music, outPath, apiKey) {
   const outDir = path.dirname(outPath);
   if (outDir) {
     fs.mkdirSync(outDir, { recursive: true });
@@ -343,6 +280,126 @@ async function main() {
       }
     }
   }
+
+  return downloadedPaths;
+}
+
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const parsed = {
+    prompt: '',
+    taskId: '',
+    version: 'v5.5',
+    custom: false,
+    instrumental: false,
+    out: './output.mp3',
+    pollInterval: 5000,
+    vocalGender: '',
+    title: '',
+    tags: '',
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case '--prompt': parsed.prompt = args[++i]; break;
+      case '--task-id': parsed.taskId = args[++i]; break;
+      case '--version': parsed.version = args[++i]; break;
+      case '--custom': parsed.custom = true; break;
+      case '--instrumental': parsed.instrumental = true; break;
+      case '--vocal-gender': parsed.vocalGender = args[++i]; break;
+      case '--title': parsed.title = args[++i]; break;
+      case '--tags': parsed.tags = args[++i]; break;
+      case '--out': parsed.out = args[++i]; break;
+      case '--poll-interval': parsed.pollInterval = parseInt(args[++i], 10) * 1000; break;
+      case '--help':
+      case '-h':
+        printUsage();
+        process.exit(0);
+    }
+  }
+
+  if (!parsed.prompt && !parsed.taskId) {
+    console.error('错误：必须提供 --prompt（提交新任务）或 --task-id（下载已有任务）');
+    console.error('');
+    printUsage();
+    process.exit(1);
+  }
+  return parsed;
+}
+
+function printUsage() {
+  console.error('用法:');
+  console.error('  提交新任务:  node generate.js --prompt "提示词" [选项]');
+  console.error('  下载旧任务:  node generate.js --task-id "task_xxx" --out ./output.mp3');
+  console.error('');
+  console.error('选项:');
+  console.error('  --prompt <text>          音乐描述或歌词（提交新任务时必填）');
+  console.error('  --task-id <id>           已有任务 ID（直接查询并下载，跳过提交步骤）');
+  console.error('  --version <ver>          Suno 版本（默认 v5.5）');
+  console.error('                           支持: v3.5, v4, v4.5, v4.5+, v4.5-all, v5, v5.5');
+  console.error('  --custom                 使用自定义模式（传歌词）');
+  console.error('  --instrumental           生成纯音乐（无人声）');
+  console.error('  --vocal-gender <gender>  人声性别（male/female）');
+  console.error('  --title <text>           歌曲标题（自定义模式）');
+  console.error('  --tags <text>            音乐风格标签（自定义模式，如 "pop, rock"）');
+  console.error('  --out <path>             输出文件路径（默认 ./output.mp3）');
+  console.error('  --poll-interval <sec>    轮询间隔秒数（默认 5）');
+}
+
+async function main() {
+  const opts = parseArgs();
+  const apiKey = loadApiKey();
+
+  let taskId;
+  let music;
+
+  if (opts.taskId) {
+    // 模式 B：直接用已有的 task_id 查询并下载
+    taskId = opts.taskId;
+    process.stderr.write(`查询已有任务: ${taskId}\n`);
+
+    const { status, music: fetchedMusic, progress, errorMsg } = await fetchTaskStatus(apiKey, taskId);
+
+    if (status === 'failed') {
+      throw new Error(`任务已失败: ${errorMsg || '未知原因'}`);
+    }
+
+    if (status === 'completed') {
+      if (fetchedMusic.length === 0) {
+        throw new Error('任务已完成但未返回音乐数据');
+      }
+      process.stderr.write(`任务已完成，开始下载\n`);
+      music = fetchedMusic;
+    } else {
+      // 任务还没完成，继续轮询
+      process.stderr.write(`任务进行中 (${progress}%)，继续轮询...\n`);
+      music = await pollTask(apiKey, taskId, opts.pollInterval);
+    }
+  } else {
+    // 模式 A：提交新任务
+    const mode = opts.custom ? '自定义模式' : '灵感模式';
+    const instrLabel = opts.instrumental ? '（纯音乐）' : '';
+    process.stderr.write(`正在提交 Suno ${opts.version} ${mode}${instrLabel}任务\n`);
+    process.stderr.write(`  prompt: ${opts.prompt}\n`);
+    if (opts.title) process.stderr.write(`  title: ${opts.title}\n`);
+    if (opts.tags) process.stderr.write(`  tags: ${opts.tags}\n`);
+    if (opts.vocalGender) process.stderr.write(`  vocal_gender: ${opts.vocalGender}\n`);
+
+    taskId = await submitTask(apiKey, opts);
+    process.stderr.write(`任务已提交: ${taskId}\n`);
+    process.stderr.write(`轮询结果中...\n`);
+
+    music = await pollTask(apiKey, taskId, opts.pollInterval);
+  }
+
+  if (music.length === 0) {
+    throw new Error('任务完成但未返回音乐数据');
+  }
+
+  process.stderr.write(`\n共生成 ${music.length} 首曲目\n`);
+
+  const outPath = path.resolve(opts.out);
+  const downloadedPaths = await downloadAllTracks(music, outPath, apiKey);
 
   if (downloadedPaths.length === 0) {
     throw new Error('所有曲目下载均失败');
