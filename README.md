@@ -134,20 +134,23 @@ node scripts/generate.js \
 
 ## 输出文件
 
-脚本完成后会自动下载以下文件到 `--out` 指定路径的同级目录：
+Suno 每次生成 **2 首曲目**，脚本会为每首曲目分别下载，文件名自动加 `_1`、`_2` 后缀区分：
 
 | 文件 | 命名规则 | 说明 |
 |------|---------|------|
-| 音频 | `<name>.mp3` | 生成的歌曲（stdout 输出此路径） |
-| 封面 | `<name>_cover.jpg` | 歌曲封面图片 |
-| 歌词 | `<name>_lyrics.txt` | 完整歌词文本 |
-| 视频 | `<name>_video.mp4` | 音乐视频（如上游返回） |
+| 音频 | `<name>_1.mp3`、`<name>_2.mp3` | 生成的歌曲（stdout 输出各文件路径，每行一个） |
+| 封面 | `<name>_1_cover.jpg`、`<name>_2_cover.jpg` | 歌曲封面图片 |
+| 歌词 | `<name>_1_lyrics.txt`、`<name>_2_lyrics.txt` | 完整歌词文本 |
+| 视频 | `<name>_1_video.mp4`、`<name>_2_video.mp4` | 音乐视频（如上游返回） |
+
+例如 `--out ./summer-song.mp3` 会生成 `summer-song_1.mp3`、`summer-song_2.mp3` 等。
 
 ## API 说明
 
 - 接口地址：`https://api.nange-ai.com/suno/v1`
 - 异步模式：提交后返回 `task_id`，轮询 `/music/tasks/{task_id}` 获取结果
-- 完成后自动下载音频、封面图、歌词、视频等完整媒体
+- 每次生成 2 首曲目，完成后自动下载所有曲目的音频、封面图、歌词、视频
+- 超时时间 15 分钟（Suno 生成通常需要 3-6 分钟）
 - 计费：只在任务完成后扣费，失败不扣费
 
 ## License
