@@ -81,7 +81,9 @@ node "$SKILL_DIR/scripts/generate.js" \
   --out "./meditation.mp3"
 ```
 
-脚本自动完成：提交任务 → 轮询状态 → 下载音频/封面/歌词/视频到本地 → stdout 输出音频文件路径。
+脚本自动完成：提交任务 → 轮询状态 → 下载所有曲目的音频/封面/歌词/视频到本地 → stdout 输出各音频文件路径（每行一个）。
+
+> Suno 每次生成 **2 首曲目**，脚本会为每首曲目分别下载，文件名自动加后缀 `_1`、`_2`。
 
 ### 判断使用灵感模式还是自定义模式
 
@@ -106,15 +108,17 @@ node "$SKILL_DIR/scripts/generate.js" \
 
 脚本成功后会自动下载以下文件到 `--out` 指定路径的同级目录：
 
-- **音频文件**：`<name>.mp3` — 生成的歌曲（stdout 输出此文件的绝对路径）
-- **封面图片**：`<name>_cover.jpg` — 歌曲封面（自动下载，如果上游返回了封面）
-- **歌词文件**：`<name>_lyrics.txt` — 完整歌词（自动保存，如果上游返回了歌词）
-- **视频文件**：`<name>_video.mp4` — 音乐视频（自动下载，如果上游返回了视频）
+每首曲目包含以下文件（文件名自动加 `_1`、`_2` 区分）：
+
+- **音频文件**：`<name>_1.mp3`、`<name>_2.mp3` — 生成的歌曲（stdout 输出各音频文件的绝对路径）
+- **封面图片**：`<name>_1_cover.jpg`、`<name>_2_cover.jpg` — 歌曲封面
+- **歌词文件**：`<name>_1_lyrics.txt`、`<name>_2_lyrics.txt` — 完整歌词
+- **视频文件**：`<name>_1_video.mp4`、`<name>_2_video.mp4` — 音乐视频（如有）
 
 例如 `--out ./summer-song.mp3` 会生成：
-- `./summer-song.mp3`（音频）
-- `./summer-song_cover.jpg`（封面）
-- `./summer-song_lyrics.txt`（歌词）
-- `./summer-song_video.mp4`（视频，如有）
+- `./summer-song_1.mp3`、`./summer-song_2.mp3`（音频）
+- `./summer-song_1_cover.jpg`、`./summer-song_2_cover.jpg`（封面）
+- `./summer-song_1_lyrics.txt`、`./summer-song_2_lyrics.txt`（歌词）
+- `./summer-song_1_video.mp4`、`./summer-song_2_video.mp4`（视频，如有）
 
-stderr 还会输出歌曲标题、风格标签、时长等元信息，可展示给用户。
+stderr 还会输出每首曲目的标题、风格标签、时长等元信息，可展示给用户。

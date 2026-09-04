@@ -161,12 +161,12 @@ async function submitTask(apiKey, opts) {
 }
 
 async function pollTask(apiKey, taskId, interval) {
-  const timeout = 10 * 60 * 1000; // 音乐生成可能需要更长时间
+  const timeout = 15 * 60 * 1000; // Suno 生成可能需要 5-10 分钟
   const start = Date.now();
 
   while (true) {
     if (Date.now() - start > timeout) {
-      throw new Error('任务超时（超过 10 分钟）');
+      throw new Error('任务超时（超过 15 分钟）');
     }
 
     const result = await request(`${BASE_URL}/music/tasks/${taskId}`, {
@@ -268,62 +268,88 @@ async function main() {
 
   const music = await pollTask(apiKey, taskId, opts.pollInterval);
 
-  const track = music[0];
-  const audioUrl = track.audio_url;
-  if (!audioUrl) {
-    throw new Error('任务完成但未返回音频链接');
+  if (music.length === 0) {
+    throw new Error('任务完成但未返回音乐数据');
   }
 
-  process.stderr.write(`歌曲标题: ${track.title || '未知'}\n`);
-  if (track.tags) process.stderr.write(`音乐风格: ${track.tags}\n`);
-  if (track.duration) process.stderr.write(`时长: ${track.duration}s\n`);
+  process.stderr.write(`\n共生成 ${music.length} 首曲目\n`);
 
   const outPath = path.resolve(opts.out);
   const outDir = path.dirname(outPath);
   if (outDir) {
     fs.mkdirSync(outDir, { recursive: true });
   }
-  const baseName = path.basename(outPath, path.extname(outPath));
+  const outExt = path.extname(outPath);
+  const outBase = path.basename(outPath, outExt);
+  const downloadedPaths = [];
 
-  process.stderr.write(`正在下载音频到 ${outPath} ...\n`);
-  await downloadFile(audioUrl, outPath, apiKey);
-  process.stderr.write(`音频下载完成\n`);
+  for (let ti = 0; ti < music.length; ti++) {
+    const track = music[ti];
+    const trackSuffix = music.length > 1 ? `_${ti + 1}` : '';
+    const trackBase = outBase + trackSuffix;
 
-  // 下载封面图片
-  if (track.image_url || track.image_large_url) {
-    const imgUrl = track.image_large_url || track.image_url;
-    const imgExt = imgUrl.includes('.png') ? '.png' : '.jpg';
-    const imgPath = path.join(outDir, baseName + '_cover' + imgExt);
+    process.stderr.write(`\n--- 曲目 ${ti + 1}/${music.length} ---\n`);
+    process.stderr.write(`歌曲标题: ${track.title || '未知'}\n`);
+    if (track.tags) process.stderr.write(`音乐风格: ${track.tags}\n`);
+    if (track.duration) process.stderr.write(`时长: ${track.duration}s\n`);
+
+    const audioUrl = track.audio_url;
+    if (!audioUrl) {
+      process.stderr.write(`警告：曲目 ${ti + 1} 无音频链接，跳过\n`);
+      continue;
+    }
+
+    const audioPath = path.join(outDir, trackBase + outExt);
+    process.stderr.write(`正在下载音频到 ${audioPath} ...\n`);
     try {
-      process.stderr.write(`正在下载封面到 ${imgPath} ...\n`);
-      await downloadFile(imgUrl, imgPath, apiKey);
-      process.stderr.write(`封面下载完成\n`);
+      await downloadFile(audioUrl, audioPath, apiKey);
+      process.stderr.write(`音频下载完成\n`);
+      downloadedPaths.push(audioPath);
     } catch (e) {
-      process.stderr.write(`封面下载失败: ${e.message}\n`);
+      process.stderr.write(`音频下载失败: ${e.message}\n`);
+      continue;
+    }
+
+    // 下载封面图片
+    if (track.image_url || track.image_large_url) {
+      const imgUrl = track.image_large_url || track.image_url;
+      const imgExt = imgUrl.includes('.png') ? '.png' : '.jpg';
+      const imgPath = path.join(outDir, trackBase + '_cover' + imgExt);
+      try {
+        process.stderr.write(`正在下载封面到 ${imgPath} ...\n`);
+        await downloadFile(imgUrl, imgPath, apiKey);
+        process.stderr.write(`封面下载完成\n`);
+      } catch (e) {
+        process.stderr.write(`封面下载失败: ${e.message}\n`);
+      }
+    }
+
+    // 保存歌词
+    if (track.lyrics) {
+      const lyricsPath = path.join(outDir, trackBase + '_lyrics.txt');
+      fs.writeFileSync(lyricsPath, track.lyrics, 'utf-8');
+      process.stderr.write(`歌词已保存到 ${lyricsPath}\n`);
+    }
+
+    // 下载视频（如果有）
+    if (track.video_url) {
+      const videoPath = path.join(outDir, trackBase + '_video.mp4');
+      try {
+        process.stderr.write(`正在下载视频到 ${videoPath} ...\n`);
+        await downloadFile(track.video_url, videoPath, apiKey);
+        process.stderr.write(`视频下载完成\n`);
+      } catch (e) {
+        process.stderr.write(`视频下载失败: ${e.message}\n`);
+      }
     }
   }
 
-  // 保存歌词
-  if (track.lyrics) {
-    const lyricsPath = path.join(outDir, baseName + '_lyrics.txt');
-    fs.writeFileSync(lyricsPath, track.lyrics, 'utf-8');
-    process.stderr.write(`歌词已保存到 ${lyricsPath}\n`);
+  if (downloadedPaths.length === 0) {
+    throw new Error('所有曲目下载均失败');
   }
 
-  // 下载视频（如果有）
-  if (track.video_url) {
-    const videoPath = path.join(outDir, baseName + '_video.mp4');
-    try {
-      process.stderr.write(`正在下载视频到 ${videoPath} ...\n`);
-      await downloadFile(track.video_url, videoPath, apiKey);
-      process.stderr.write(`视频下载完成\n`);
-    } catch (e) {
-      process.stderr.write(`视频下载失败: ${e.message}\n`);
-    }
-  }
-
-  // stdout 输出本地文件路径
-  console.log(outPath);
+  // stdout 输出所有下载的文件路径（每行一个）
+  downloadedPaths.forEach(p => console.log(p));
 }
 
 main().catch((err) => {
